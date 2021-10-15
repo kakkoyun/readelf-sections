@@ -2,7 +2,6 @@ package main
 
 import (
 	"debug/elf"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,15 +11,6 @@ import (
 )
 
 func main() {
-	outFile := ""
-	flagset := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	flagset.StringVar(&outFile, "output", "debug.symbols", "The file path to put object file with extracted symbols.")
-
-	err := flagset.Parse(os.Args[2:])
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if len(os.Args) < 2 {
 		fmt.Println("missing parameter, please provide  a file")
 		return
