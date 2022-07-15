@@ -6,6 +6,10 @@ LDFLAGS="-X main.version=$(VERSION)"
 .PHONY: build
 build: readelf-sections
 
+.PHONY: install
+install: readelf-sections
+	go install .
+
 readelf-sections: go.mod main.go
 	CGO_ENABLED=0 go build -ldflags=$(LDFLAGS) -o $@ main.go
 
