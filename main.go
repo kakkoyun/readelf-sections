@@ -28,6 +28,7 @@ func main() {
 		Name       string
 		Type       string
 		Size       uint64
+		FileSize   uint64
 		Flags      string
 		Link       string
 		Compressed bool
@@ -44,6 +45,7 @@ func main() {
 			Name:       s.Name,
 			Type:       s.Type.String(),
 			Size:       s.Size,
+			FileSize:   s.FileSize,
 			Flags:      s.Flags.String(),
 			Link:       idxSection[int(s.Link)],
 			Compressed: s.Flags&elf.SHF_COMPRESSED != 0,
@@ -56,12 +58,12 @@ func main() {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetAutoIndex(true)
-	t.AppendHeader(table.Row{"Name", "Type", "Size", "Flags", "Link", "Compressed"})
+	t.AppendHeader(table.Row{"Name", "Type", "Size", "File Size", "Flags", "Link", "Compressed"})
 	var sum uint64
 	for _, s := range sections {
 		sum += s.Size
 		t.AppendRow(table.Row{
-			s.Name, s.Type, humanize.Bytes(s.Size), s.Flags, s.Link, s.Compressed,
+			s.Name, s.Type, humanize.Bytes(s.Size), humanize.Bytes(s.FileSize), s.Flags, s.Link, s.Compressed,
 		})
 	}
 	t.AppendFooter(table.Row{"", "Total Size", humanize.Bytes(sum)})
