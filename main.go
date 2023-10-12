@@ -18,7 +18,18 @@ func main() {
 	}
 	path := os.Args[1]
 
-	elfFile, err := elf.Open(path)
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatalf("error while opening file %s: %s", path, err.Error())
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		log.Fatalf("error while reading file stats %s: %s", path, err.Error())
+	}
+
+	elfFile, err := elf.NewFile(f)
 	if err != nil {
 		log.Fatalf("error while opening ELF file %s: %s", path, err.Error())
 	}
@@ -27,6 +38,7 @@ func main() {
 	type sectionInfo struct {
 		Name       string
 		Type       string
+		Offset     uint64
 		Size       uint64
 		FileSize   uint64
 		Flags      string
@@ -44,6 +56,7 @@ func main() {
 		sections = append(sections, sectionInfo{
 			Name:       s.Name,
 			Type:       s.Type.String(),
+			Offset:     s.Offset,
 			Size:       s.Size,
 			FileSize:   s.FileSize,
 			Flags:      s.Flags.String(),
@@ -58,14 +71,20 @@ func main() {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetAutoIndex(true)
-	t.AppendHeader(table.Row{"Name", "Type", "Size", "File Size", "Flags", "Link", "Compressed"})
-	var sum uint64
+	t.AppendHeader(table.Row{"Name", "Type", "Offset", "Size", "File Size", "Flags", "Link", "Compressed"})
+	var (
+		sum   uint64
+		fzSum uint64
+	)
 	for _, s := range sections {
 		sum += s.Size
+		fzSum += s.FileSize
 		t.AppendRow(table.Row{
-			s.Name, s.Type, humanize.Bytes(s.Size), humanize.Bytes(s.FileSize), s.Flags, s.Link, s.Compressed,
+			s.Name, s.Type, s.Offset, humanize.Bytes(s.Size), humanize.Bytes(s.FileSize), s.Flags, s.Link, s.Compressed,
 		})
 	}
-	t.AppendFooter(table.Row{"", "Total Size", humanize.Bytes(sum)})
+	t.AppendFooter(
+		table.Row{"", "", "Total", humanize.Bytes(sum), humanize.Bytes(fzSum), "Actual File Size", humanize.Bytes(uint64(stat.Size()))},
+	)
 	t.Render()
 }
