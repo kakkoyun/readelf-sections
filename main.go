@@ -3,9 +3,9 @@ package main
 import (
 	"debug/elf"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"sort"
 
 	"github.com/dustin/go-humanize"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -36,6 +36,8 @@ func main() {
 	defer elfFile.Close()
 
 	type sectionInfo struct {
+		*elf.Section
+
 		Name       string
 		Type       string
 		Offset     uint64
@@ -54,6 +56,8 @@ func main() {
 	var sections []sectionInfo
 	for _, s := range elfFile.Sections {
 		sections = append(sections, sectionInfo{
+			Section: s,
+
 			Name:       s.Name,
 			Type:       s.Type.String(),
 			Offset:     s.Offset,
@@ -64,9 +68,6 @@ func main() {
 			Compressed: s.Flags&elf.SHF_COMPRESSED != 0,
 		})
 	}
-	sort.Slice(sections, func(i, j int) bool {
-		return sections[i].Size > sections[j].Size
-	})
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -78,7 +79,11 @@ func main() {
 	)
 	for _, s := range sections {
 		sum += s.Size
-		fzSum += s.FileSize
+		size, err := fileSize(f, s.Section)
+		if err != nil {
+			log.Printf("failed to read the size of %s: %s\n", s.Name, err.Error())
+		}
+		fzSum += size
 		t.AppendRow(table.Row{
 			s.Name, s.Type, s.Offset, humanize.Bytes(s.Size), humanize.Bytes(s.FileSize), s.Flags, s.Link, s.Compressed,
 		})
@@ -87,4 +92,22 @@ func main() {
 		table.Row{"", "", "Total", humanize.Bytes(sum), humanize.Bytes(fzSum), "Actual File Size", humanize.Bytes(uint64(stat.Size()))},
 	)
 	t.Render()
+}
+
+func fileSize(src io.ReaderAt, sec *elf.Section) (uint64, error) {
+	if sec.Type == elf.SHT_NOBITS {
+		return 0, nil
+	}
+	var rs io.ReadSeeker
+	if sec.Flags&elf.SHF_COMPRESSED != 0 {
+		// Compressed
+		rs = io.NewSectionReader(src, int64(sec.Offset), int64(sec.FileSize))
+	} else {
+		rs = sec.Open()
+	}
+	b, err := io.ReadAll(rs)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(len(b)), nil
 }
